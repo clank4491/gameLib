@@ -45,14 +45,40 @@ passport.use(new LocalStrategy({
 	passwordField:''
 },
 function(username, password, done){
-	var user = {
-		username: username,
-		password: password
-	};
-	done(null, user);
+	MongoClient.connect(url, function(err, db){
+		if(err) throw err;
+
+
+		var dbObj = db.db("users");
+
+		dbObj.collection("users").findOne({username:username}, function(err, results){
+			if(results.password === password){
+			var user = results;
+			done(null,user);
+			}
+			else{
+				done(null, false, {message:'Bad Password'});
+			}
+		});
+	});
+
 }));
 
-app.get("/", function(request,response){
+function ensureAuthenticated(req, res, next){
+	if(rec.isAuthenticated){
+		next();
+	}
+	else{
+		res.redirect("\sign-in");
+	}
+}
+
+app.get("/logout",function(req,res){
+	req.logout();
+	res.redirect("\sign-in");
+});
+
+app.get("/",ensureAuthenticated, function(request,response){
 
 	MongoClient.connect(url, function (err, db){
 	if(err) throw err;
@@ -67,7 +93,7 @@ app.get("/", function(request,response){
 
 });
 
-app.get("/new-entry", function(request,response){
+app.get("/new-entry", ensureAuthenticated, function(request,response){
 
 	response.render("new-entry");
 });
@@ -118,7 +144,7 @@ app.post("/sign-up",function(request, response){
 		dbObj.collection('users').insert(user,function(err, results){
 			if(err) throw err;
 				request.login(request.body, function(){
-				response.redirect('profile');
+				response.redirect('/profile');
 			});
 		});
 	});
@@ -129,7 +155,7 @@ app.post("/sign-up",function(request, response){
 app.post("/sign-in", passport.authenticate('local', {
 	failureRedirect:'/sign-in'
 }), function (request, response){
-		response.redirect('/profile');
+		response.redirect('/');
 });
 
 app.get('/profile', function(request, response){
@@ -143,8 +169,3 @@ app.use(function(request, response){
 http.createServer(app).listen(3000, function(){
 	console.log("Game library server started on port 3000");
 });
-
-
-
-
-
